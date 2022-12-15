@@ -12,9 +12,11 @@ LuaState.loadLibLua(windows: 'path/to/dll', macos: 'path/to/dylib', linux: 'path
 final luaState = LuaState();
 ```
 
-# Cleaning up the state (frees up the memory allocated by Lua, only call this once when the lua VM itself is no longer needed, not when the binding is no longer needed)
+# Cleaning up the state
 
 ```dart
+// Frees up the memory allocated by Lua.
+// Only call this once when the lua VM itself is no longer needed, not when the binding is no longer needed!
 luaState.destroy();
 ```
 
