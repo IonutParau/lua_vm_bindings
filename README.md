@@ -46,3 +46,17 @@ void main() {
 }
 
 ```
+
+# Running examples
+
+First clone this repository:
+
+```sh
+git clone https://github.com/IonutParau/lua_vm_bindings 'lua_vm_bindings'
+```
+
+Then cd into the newly-made directory and run an example like so:
+
+```dart
+dart run example/<example>.dart
+```
