@@ -8,14 +8,22 @@ int panicHandler(Pointer p) {
   return 0;
 }
 
+int testFunc(LuaState ls) {
+  print(ls.toStr(-1));
+  ls.pushString("Returned from Dart!");
+  return 1;
+}
+
 void main() {
-  LuaState.loadLibLua(linux: 'external_libs/liblua54.so');
+  LuaState.loadLibLua(linux: 'dlls/liblua54.so');
   final ls = LuaState();
   ls.openLibs();
-  print("We have ${ls.top} elements on the stack!");
-  ls.atPanic(LuaNativeFunctionPointer.fromFunction<LuaNativeFunction>(panicHandler, 1));
-  ls.pushString("This is an error message");
-  ls.error();
-  print(ls.statePtr);
+
+  ls.pushDartFunction(testFunc);
+  ls.pushString("Argument from Dart!");
+  ls.call(1, 1);
+  print(ls.toStr(-1));
+  ls.pop();
+
   ls.destroy();
 }

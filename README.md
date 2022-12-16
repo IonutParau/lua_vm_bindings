@@ -22,29 +22,15 @@ luaState.destroy();
 
 # Using Functions
 
-Due to the restrictions on converting Dart functions to C function pointers, you need to convert the functions over yourself.
+Thanks to a work-around, pushing Dart functions works like pushing C function.
 
 ```dart
-int returnTrue(Pointer p) {
-  final ls = LuaState(pointer: p);
-
-  ls.pushBoolean(true);
-
-  return 1;
-}
-
-void main() {
-  LuaState.loadLibLua(/* paths here */);
-
-  final luaState = LuaState();
-
-  // Push the function.
-  luaState.pushCFunction(LuaNativeFunctionPointer.fromFunction(returnTrue));
-
-  // At the end
-  luaState.destroy();
-}
-
+// It supports closures, unlike C functions!
+ls.pushDartFunction((ls) {
+  if(ls.top == 0) return 0;
+  print(ls.toStr(-1));
+  return 0;
+});
 ```
 
 # Running examples
