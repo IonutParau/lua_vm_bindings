@@ -17,7 +17,7 @@ int customHandler(Pointer p) {
 }
 
 void main() {
-  LuaState.loadLibLua(linux: 'dlls/liblua54.so');
+  LuaState.loadLibLua(linux: 'dlls/liblua54.so', windows: 'dlls/liblua54.dll', macos: 'dlls/liblua52.dylib');
   final ls = LuaState();
   ls.openLibs();
 
