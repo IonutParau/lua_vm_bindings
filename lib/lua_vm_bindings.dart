@@ -616,6 +616,7 @@ class LuaState {
     _tolStrFn ??= dll!.lookupFunction<Pointer<Utf8> Function(Pointer, Int, Pointer<Int>), Pointer<Utf8> Function(Pointer, int, Pointer<Int>)>('lua_tolstring');
 
     final p = _tolStrFn!(statePtr, i, nullptr);
+    pop(1);
 
     if (p.address == nullptr.address) {
       return null;
