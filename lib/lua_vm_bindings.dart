@@ -63,14 +63,12 @@ int _luaCallCorrespondingDartFunction(Pointer state) {
 }
 
 int _luaCleanupDartFuncBinding(Pointer state) {
-  print("e");
   final ls = LuaState(pointer: state);
   if (!ls.getMetatable(-1)) return 0;
   ls.getField(-1, "dart_fn");
   final i = ls.toInteger(-1);
   _luaPushedDartFuncs.remove(i);
   ls.pop(1);
-  print(i);
   return 0;
 }
 
@@ -179,7 +177,7 @@ class LuaState {
     return LuaThreadStatus.values[i];
   }
 
-  int Function(Pointer, Pointer<Utf8>)? _loadFileXFn;
+  int Function(Pointer, Pointer<Utf8>, Pointer<Utf8>)? _loadFileXFn;
   int Function(Pointer, Pointer<Utf8>)? _loadStringFn;
 
   LuaThreadStatus loadFile(String fileName) {
@@ -187,11 +185,11 @@ class LuaState {
   }
 
   LuaThreadStatus loadFileX(String fileName, String? mode) {
-    _loadFileXFn ??= dll!.lookupFunction<Int Function(Pointer, Pointer), int Function(Pointer, Pointer<Utf8>)>('luaL_loadfile');
+    _loadFileXFn ??= dll!.lookupFunction<Int Function(Pointer, Pointer, Pointer), int Function(Pointer, Pointer<Utf8>, Pointer<Utf8>)>('luaL_loadfilex');
 
     final ptr = mode == null ? nullptr : mode.toNativeUtf8();
     final fnptr = fileName.toNativeUtf8();
-    final r = LuaThreadStatus.values[_loadFileXFn!(fnptr, ptr)];
+    final r = LuaThreadStatus.values[_loadFileXFn!(statePtr, fnptr, ptr)];
     if (ptr.address != nullptr.address) malloc.free(ptr);
     malloc.free(fnptr);
 
@@ -444,13 +442,9 @@ class LuaState {
     _pushNumfn!(statePtr, n);
   }
 
-  void Function(Pointer)? _newTableFn;
-
   /// Creates a new empty table and pushes it onto the stack
   void newTable() {
-    _newTableFn ??= dll!.lookupFunction<Void Function(Pointer), void Function(Pointer)>('lua_newtable');
-
-    _newTableFn!(statePtr);
+    createTable(0, 0);
   }
 
   void Function(Pointer, int, int)? _createTableFn;
@@ -489,9 +483,6 @@ class LuaState {
     final t = table % (top + 1);
     final k = key % (top + 1);
     final v = val % (top + 1);
-
-    print([t, k, v]);
-    print([type(t), type(k), type(v)]);
 
     pushNil();
     pushNil();
@@ -616,7 +607,6 @@ class LuaState {
     _tolStrFn ??= dll!.lookupFunction<Pointer<Utf8> Function(Pointer, Int, Pointer<Int>), Pointer<Utf8> Function(Pointer, int, Pointer<Int>)>('lua_tolstring');
 
     final p = _tolStrFn!(statePtr, i, nullptr);
-    pop(1);
 
     if (p.address == nullptr.address) {
       return null;
