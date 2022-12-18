@@ -53,7 +53,7 @@ int _luaCallCorrespondingDartFunction(Pointer state) {
     final fn = _luaPushedDartFuncs[up];
 
     if (fn != null) {
-      return fn.call(ls);
+      return fn.call(LuaState(pointer: state));
     }
   } catch (e) {
     print('Calling a Dart function from Lua raised Dart error: $e');
@@ -71,8 +71,6 @@ int _luaCleanupDartFuncBinding(Pointer state) {
   ls.pop(1);
   return 0;
 }
-
-final _luaStates = <int, LuaState>{};
 
 /// Container for a LuaState from the Lua DLL.
 class LuaState {
@@ -94,12 +92,6 @@ class LuaState {
   }) {
     if (pointer != null) {
       statePtr = pointer;
-      if (_luaStates[pointer.address] != null) {
-        final ls = _luaStates[pointer.address]!;
-        dll = ls.dll;
-      } else {
-        _luaStates[pointer.address] = this;
-      }
     }
     dll ??= _libLua;
     _init(pointer == null);
@@ -125,8 +117,6 @@ class LuaState {
     _destroyer ??= dll!.lookupFunction<Void Function(Pointer), void Function(Pointer)>('lua_close');
 
     _destroyer!(statePtr);
-
-    _luaStates.remove(statePtr.address);
   }
 
   void Function(Pointer ls)? _openLibsFn;
@@ -617,12 +607,13 @@ class LuaState {
 
   /// Helper function that takes a map of values and makes a new table with those contents (to the best of its abilitied, not all values are serializable)
   /// Supports both [LuaDartFunction]s and [LuaNativeFunctionPointer].
-  void pushLib(Map<String, dynamic> lib) {
+  void pushLib(Map<String, dynamic> lib, [LuaDartFunctionReleaser? releaser]) {
     createTable(lib.length, lib.length);
     lib.forEach((key, value) {
       pushString(key);
 
       if (value is LuaDartFunction) {
+        releaser?.bind(value);
         pushDartFunction(value);
       } else if (value is String) {
         pushString(value);
@@ -646,8 +637,8 @@ class LuaState {
 
   /// Like [pushLib], but it also sets it to a global [name].
   /// If [markAsLoaded] is `true`, it will also set `package.loaded[modname]` to that value.
-  void makeLib(String name, Map<String, dynamic> lib, {bool markAsLoaded = true}) {
-    pushLib(lib);
+  void makeLib(String name, Map<String, dynamic> lib, {bool markAsLoaded = true, LuaDartFunctionReleaser? releaser}) {
+    pushLib(lib, releaser);
 
     // Make global
     setGlobal(name);
@@ -698,12 +689,27 @@ class LuaState {
   }
 
   /// Checks if the value at [i] is a nil or none.
-  bool isNlOrNone(int i) {
+  bool isNilOrNone(int i) {
     return type(i) == LuaType.nil || type(i) == LuaType.none;
   }
 
   /// Checks if the value at [i] is a table.
   bool isThread(int i) {
     return type(i) == LuaType.thread;
+  }
+}
+
+class LuaDartFunctionReleaser {
+  final _fns = <LuaDartFunction>[];
+
+  void bind(LuaDartFunction fn) {
+    _fns.add(fn);
+  }
+
+  void release() {
+    for (var fn in _fns) {
+      _luaPushedDartFuncs.remove(fn.hashCode);
+    }
+    _fns.clear();
   }
 }
