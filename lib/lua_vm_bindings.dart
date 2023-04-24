@@ -361,12 +361,19 @@ class LuaState {
   /// 2. Push the [_luaCallCorrespondingDartFunction] function pointer on the stack as a C closure with an upvalue being that hashcode.
   /// 3. Tell [_luaCallCorrespondingDartFunction] to call [fn] if the upvalue it has been called with is [fn.hashCode]
   void pushDartFunction(LuaDartFunction fn) {
+    newTable();
+
+    // (+1)
+    newMetatable("${fn.hashCode}-dart-func-bindings");
+
+    // (+3) (-1)
+    pushString("__call");
     pushInteger(fn.hashCode);
     pushCClosure(LuaNativeFunctionPointer.fromFunction<LuaNativeFunction>(_luaCallCorrespondingDartFunction, 0), 1);
     _luaPushedDartFuncs[fn.hashCode] = fn;
 
-    // (+1)
-    newMetatable("${fn.hashCode}-dart-func-bindings");
+    // (-2)
+    setTable(-3);
 
     // (+2)
     pushString("dart_fn");
