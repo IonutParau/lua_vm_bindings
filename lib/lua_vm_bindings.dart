@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:ffi/ffi.dart';
 
@@ -70,6 +72,88 @@ int _luaCleanupDartFuncBinding(Pointer state) {
   _luaPushedDartFuncs.remove(i);
   ls.pop(1);
   return 0;
+}
+
+class LuaTable {
+  final Map<dynamic, dynamic> _internal;
+
+  LuaTable() : _internal = {};
+
+  void insert(key, value) {
+    _internal[key] = value;
+  }
+
+  get(key) => _internal[key];
+
+  bool get isList {
+    double len = 0;
+
+    for (var pair in _internal.entries) {
+      var key = pair.key;
+
+      if (key is num) {
+        if (key <= 0) {
+          return false;
+        }
+        if (key.isNaN || key.isInfinite) {
+          return false;
+        }
+        len = max(len, key.toDouble());
+      } else {
+        return false;
+      }
+    }
+
+    if (len == 0) {
+      return true; // Uhh...
+    }
+
+    return true;
+  }
+
+  List toList() {
+    var i = 1;
+    final l = [];
+
+    while (_internal[i] != null) {
+      final v = _internal[i];
+
+      l.add(v is LuaTable ? v.toDartVal() : v);
+
+      i++;
+    }
+
+    return l;
+  }
+
+  Map toMap() {
+    var m = <dynamic, dynamic>{};
+
+    _internal.forEach(
+      (key, value) {
+        m[key] = value is LuaTable ? value.toDartVal() : value;
+      },
+    );
+
+    return m;
+  }
+
+  Map<String, dynamic> toMapWithStringKeys() {
+    var m = toMap();
+
+    return Map.fromEntries(m.entries.map((entry) => MapEntry<String, dynamic>(entry.key.toString(), entry.value)));
+  }
+
+  dynamic toDartVal() {
+    if (isList) {
+      return toList();
+    }
+    return toMap();
+  }
+
+  String toJson() {
+    return json.encode(toDartVal());
+  }
 }
 
 /// Container for a LuaState from the Lua DLL.
@@ -565,7 +649,7 @@ class LuaState {
 
   /// Returns the value at [i] as a [LuaCFunction]
   LuaCFunction toCFunction(int i) {
-    _toCFn ??= dll!.lookupFunction<LuaNativeFunctionPointer Function(Pointer, Int), LuaNativeFunctionPointer Function(Pointer, int)>('lua_toboolean');
+    _toCFn ??= dll!.lookupFunction<LuaNativeFunctionPointer Function(Pointer, Int), LuaNativeFunctionPointer Function(Pointer, int)>('lua_tocfunction');
 
     return _toCFn!(statePtr, i).asFunction<LuaCFunction>();
   }
@@ -703,6 +787,40 @@ class LuaState {
   /// Checks if the value at [i] is a table.
   bool isThread(int i) {
     return type(i) == LuaType.thread;
+  }
+
+  dynamic toDartValue(int i) {
+    if (isBoolean(i)) {
+      return toBoolean(i);
+    }
+    if (isNumber(i)) {
+      return toNumber(i);
+    }
+    if (isStr(i)) {
+      return toStr(i);
+    }
+    if (isTable(i)) {
+      return exportAsTable(i);
+    }
+  }
+
+  LuaTable? exportAsTable(int i) {
+    pushNil();
+    final t = LuaTable();
+
+    cleanup() {
+      pop(2);
+      return null;
+    }
+
+    while (next(i) != 0) {
+      var val = toDartValue(-1);
+      var key = toDartValue(-2);
+      pop(2);
+      t.insert(key, val);
+    }
+
+    return t;
   }
 }
 
